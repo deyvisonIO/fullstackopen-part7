@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useField } from './hooks/index'
+import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from 'react-router-dom'
 
 const Menu = () => {
   const padding = {
@@ -6,18 +8,39 @@ const Menu = () => {
   }
   return (
     <div>
-      <a href='#' style={padding}>anecdotes</a>
-      <a href='#' style={padding}>create new</a>
-      <a href='#' style={padding}>about</a>
+      <Link to='/' style={padding}>anecdotes</Link>
+      <Link to='/create' style={padding}>create new</Link>
+      <Link to='/about' style={padding}>about</Link>
     </div>
   )
 }
+
+const Anecdote = ({ anecdotes }) => {
+  const id = useParams().id
+
+  const anecdote = anecdotes.find(anecdote => anecdote.id === Number(id))
+
+  return (
+    <div>
+      <h2>{anecdote.content}</h2>
+      <p>has {anecdote.votes} votes</p>
+      <p>for more information see <a href={anecdote.info}>{anecdote.info}</a></p>
+    </div>
+  )
+}
+
 
 const AnecdoteList = ({ anecdotes }) => (
   <div>
     <h2>Anecdotes</h2>
     <ul>
-      {anecdotes.map(anecdote => <li key={anecdote.id} >{anecdote.content}</li>)}
+      {anecdotes.map(anecdote => (
+        <li key={anecdote.id}>
+          <Link to={"/anecdotes/" + anecdote.id}>
+            {anecdote.content}
+          </Link>
+        </li>
+      ))}
     </ul>
   </div>
 )
@@ -45,19 +68,35 @@ const Footer = () => (
 )
 
 const CreateNew = (props) => {
-  const [content, setContent] = useState('')
-  const [author, setAuthor] = useState('')
-  const [info, setInfo] = useState('')
+  const {reset: contentReset, ...content} = useField('text')
+  const {reset: authorReset, ...author} = useField('text')
+  const {reset: infoReset, ...info} = useField('url')
+  const [isCreated, setIsCreated] = useState(false)
 
+  const resetAll = () => {
+    contentReset()
+    authorReset()
+    infoReset()
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault()
     props.addNew({
-      content,
-      author,
-      info,
+      content: content.value,
+      author: author.value,
+      info: info.value,
       votes: 0
     })
+
+    setIsCreated(true)
+
+    props.notify(content.value)
+  }
+
+  if(isCreated) {
+    return (
+      <Navigate replace to="/" />
+    )
   }
 
   return (
@@ -66,17 +105,19 @@ const CreateNew = (props) => {
       <form onSubmit={handleSubmit}>
         <div>
           content
-          <input name='content' value={content} onChange={(e) => setContent(e.target.value)} />
+          <input name='content' {...content} />
         </div>
         <div>
           author
-          <input name='author' value={author} onChange={(e) => setAuthor(e.target.value)} />
+          <input name='author' {...author} />
         </div>
         <div>
           url for more info
-          <input name='info' value={info} onChange={(e)=> setInfo(e.target.value)} />
+          <input name='info' {...info}/>
         </div>
-        <button>create</button>
+        <button type="submit">create</button>
+        <button type="button" onClick={resetAll}>reset</button>
+
       </form>
     </div>
   )
@@ -108,6 +149,11 @@ const App = () => {
     setAnecdotes(anecdotes.concat(anecdote))
   }
 
+  const notify = (content) => {
+    setNotification(`a new anecdote ${content} created!`)
+    setTimeout(() => setNotification(""), 5000)
+  }
+
   const anecdoteById = (id) =>
     anecdotes.find(a => a.id === id)
 
@@ -123,14 +169,20 @@ const App = () => {
   }
 
   return (
-    <div>
+    <BrowserRouter>
       <h1>Software anecdotes</h1>
       <Menu />
-      <AnecdoteList anecdotes={anecdotes} />
-      <About />
-      <CreateNew addNew={addNew} />
+      {notification ? <p>{notification}</p> : null}
+
+      <Routes>
+        <Route path="/" element={<AnecdoteList anecdotes={anecdotes} />} />
+        <Route path="/create" element={<CreateNew addNew={addNew} notify={notify} />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/anecdotes/:id" element={<Anecdote anecdotes={anecdotes} />} />
+      </Routes>
       <Footer />
-    </div>
+
+    </BrowserRouter>
   )
 }
 
